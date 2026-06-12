@@ -20,7 +20,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type = THREE.VSMShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY);
@@ -40,7 +42,7 @@ const stationDefs = STATIONS.map((def, i) => ({
 const stationDistances = stationDefs.map((s) => s.distance);
 
 const builtStations = createStations(scene, curve, trackLength, stationDefs);
-const scenery = createScenery(scene, curve, SKY);
+const scenery = createScenery(scene, curve, trackLength, stationDistances);
 const lights = createLights(scene);
 const train = createTrain(scene, curve, trackLength);
 
@@ -107,7 +109,7 @@ renderer.setAnimationLoop(() => {
   train.update(distance, velocity, dt, time);
   zones.update(distance);
   overlay.updateProgress(distance, stationDistances);
-  updateCamera(distance, dt);
+  updateCamera(distance, dt, velocity);
 
   trainPos.copy(train.loco.position);
   lights.update(trainPos);

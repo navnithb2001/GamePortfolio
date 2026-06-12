@@ -4,6 +4,7 @@ const ACCEL = 17; // u/s² under throttle
 const BRAKE = 30; // u/s² when throttle opposes motion
 const MAX_FWD = 26; // u/s
 const MAX_REV = 12;
+const AUTO_MAX = 70; // u/s fast-motion cap for route-map autopilot rides
 const DRAG = 1.1; // exponential coast decay
 const MIN_DIST = 4.6; // keeps the coach on the rails at the rear
 
@@ -18,10 +19,10 @@ export function createMovement(trackLength, startDistance) {
     velocity += wheelImpulse;
 
     if (autoTarget !== null) {
-      // Autopilot: chase a velocity proportional to remaining distance.
+      // Fast-motion autopilot: sprint toward the target, brake hard on arrival.
       const remaining = autoTarget - distance;
-      const desired = THREE.MathUtils.clamp(remaining * 0.55, -MAX_FWD * 0.8, MAX_FWD * 0.8);
-      velocity = THREE.MathUtils.damp(velocity, desired, 3.5, dt);
+      const desired = THREE.MathUtils.clamp(remaining * 1.4, -AUTO_MAX, AUTO_MAX);
+      velocity = THREE.MathUtils.damp(velocity, desired, 4.5, dt);
       if (Math.abs(remaining) < 0.4 && Math.abs(velocity) < 0.6) {
         velocity = 0;
         autoTarget = null;
@@ -34,7 +35,8 @@ export function createMovement(trackLength, startDistance) {
       if (Math.abs(velocity) < 0.02) velocity = 0;
     }
 
-    velocity = THREE.MathUtils.clamp(velocity, -MAX_REV, MAX_FWD);
+    const auto = autoTarget !== null;
+    velocity = THREE.MathUtils.clamp(velocity, auto ? -AUTO_MAX : -MAX_REV, auto ? AUTO_MAX : MAX_FWD);
     distance += velocity * dt;
 
     // Hard stops at the buffer ends.

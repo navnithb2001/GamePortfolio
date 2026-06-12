@@ -27,6 +27,34 @@ export function createTrack() {
   const length = curve.getLength();
   const group = new THREE.Group();
 
+  // Ballast bed: a flat gravel ribbon under the sleepers.
+  {
+    const half = 2.0;
+    const segs = 300;
+    const positions = new Float32Array((segs + 1) * 2 * 3);
+    const indices = [];
+    const n = new THREE.Vector3();
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const p = curve.getPointAt(t);
+      const tan = curve.getTangentAt(t);
+      n.crossVectors(UP, tan).normalize();
+      positions.set([p.x - n.x * half, 0.045, p.z - n.z * half], i * 6);
+      positions.set([p.x + n.x * half, 0.045, p.z + n.z * half], i * 6 + 3);
+      if (i < segs) {
+        const a = i * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    const ballast = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xcbb18d }));
+    ballast.receiveShadow = true;
+    group.add(ballast);
+  }
+
   // Two rails: tubes along curves offset perpendicular to the track.
   const railMat = new THREE.MeshLambertMaterial({ color: 0x5d5048 });
   const samples = 600;

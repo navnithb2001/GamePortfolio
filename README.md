@@ -13,7 +13,7 @@ of the portfolio, ending at Contact.
 | `↑` / `W` (hold) | accelerate forward |
 | `↓` / `S` (hold) | brake, then reverse |
 | Scroll wheel | nudge the train |
-| Route-map dots (right side) | auto-drive to that station |
+| Route-map dots (right side) | fast-travel to that station |
 | ▲ / ▼ buttons | touch devices |
 
 Deep links: `?at=education`, `?at=contact`, … start the ride at a station.
