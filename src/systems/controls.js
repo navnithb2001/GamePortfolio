@@ -55,6 +55,8 @@ export function createControls({ onFirstInput }) {
   window.addEventListener(
     'wheel',
     (e) => {
+      // Scrolling inside the station card should scroll the card, not the train.
+      if (e.target instanceof Element && e.target.closest('#card')) return;
       wheelImpulse += e.deltaY * 0.012;
       announce();
     },
