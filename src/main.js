@@ -10,9 +10,10 @@ import { createControls } from './systems/controls.js';
 import { createMovement } from './systems/movement.js';
 import { createChaseCamera } from './systems/camera.js';
 import { createZones } from './systems/zones.js';
+import { createPostFX } from './systems/postfx.js';
 import { createOverlay } from './ui/overlay.js';
 
-const SKY = 0xfdeed7;
+const SKY = 0xffe0b5; // horizon color; the dome carries the full gradient
 
 // --- renderer / scene -------------------------------------------------------
 const canvas = document.getElementById('scene');
@@ -26,7 +27,29 @@ renderer.toneMappingExposure = 1.15;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(SKY, 130, 460);
+scene.fog = new THREE.Fog(SKY, 130, 430);
+
+// Gradient sky dome: warm peach horizon rising into soft lavender.
+{
+  const c = document.createElement('canvas');
+  c.width = 2;
+  c.height = 512;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 512, 0, 0);
+  grad.addColorStop(0, '#ffe3b8');
+  grad.addColorStop(0.42, '#ffd9c0');
+  grad.addColorStop(1, '#bfcdf4');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 2, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(700, 20, 12),
+    new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false })
+  );
+  dome.position.set(0, 0, -300);
+  scene.add(dome);
+}
 
 // --- world -------------------------------------------------------------------
 const { curve, length: trackLength, group: trackGroup } = createTrack();
@@ -58,6 +81,7 @@ const { camera, update: updateCamera, resize: resizeCamera } = createChaseCamera
   trackLength,
   startDistance
 );
+const postfx = createPostFX(renderer, scene, camera);
 
 const overlay = createOverlay(stationDefs, {
   onStopClick: (i) => movement.driveTo(stationDefs[i].distance)
@@ -89,6 +113,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   resizeCamera();
+  postfx.resize();
 });
 
 const timer = new THREE.Timer();
@@ -123,5 +148,5 @@ renderer.setAnimationLoop(() => {
     camera.lookAt(tx, ty, tz);
   }
 
-  renderer.render(scene, camera);
+  postfx.render();
 });

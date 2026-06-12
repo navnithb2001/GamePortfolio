@@ -108,6 +108,19 @@ function buildStation(name, color) {
   }
   g.add(signGroup);
 
+  // Warm glowing platform lamps.
+  for (const x of [-6.8, 6.8]) {
+    const lampPole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 2.5, 6), lambert(DARK));
+    lampPole.position.set(x, 2.15, 4.2);
+    g.add(lampPole);
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 8, 6),
+      new THREE.MeshLambertMaterial({ color: 0xffe9c0, emissive: 0xffb84d, emissiveIntensity: 1.4 })
+    );
+    bulb.position.set(x, 3.55, 4.2);
+    g.add(bulb);
+  }
+
   const bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.7), accent);
   bench.position.set(5.2, 1.3, 3.2);
   g.add(bench);

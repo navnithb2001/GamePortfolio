@@ -60,6 +60,8 @@ html, body {
   gap: 10px;
   position: relative;
 }
+.rm-stop:focus:not(:focus-visible) { outline: none; }
+.rm-stop:focus-visible { outline: 2px solid var(--ink); border-radius: 8px; }
 .rm-stop .rm-label {
   font-size: 0.72rem;
   font-weight: 600;

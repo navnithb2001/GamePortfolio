@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { pointAt, tangentAt } from '../world/track.js';
 
-const CHASE_BACK = 16;
-const CHASE_UP = 8.5;
+const CHASE_BACK = 17.5;
+const CHASE_UP = 9.8;
 const LOOK_AHEAD = 7;
 
 export function createChaseCamera(curve, trackLength, startDistance) {
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 700);
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1600);
   let baseFov = 50;
 
   const trainPos = new THREE.Vector3();

@@ -16,31 +16,88 @@ function lambert(color, flat = false) {
   return new THREE.MeshLambertMaterial({ color, flatShading: flat });
 }
 
-// Soft radial gradient + mottled speckle so the sand reads as terrain, not a flat fill.
-function makeGroundTexture(rand) {
+// Ground plane is 1700×1700 centered at (0,0,-300); maps world → canvas px.
+const GROUND_SIZE = 1700;
+const GROUND_CENTER_Z = -300;
+const TEX_SIZE = 2048;
+const worldToPx = (x, z) => [
+  ((x + GROUND_SIZE / 2) / GROUND_SIZE) * TEX_SIZE,
+  ((z - GROUND_CENTER_Z + GROUND_SIZE / 2) / GROUND_SIZE) * TEX_SIZE
+];
+
+// Soft radial gradient + mottled speckle, plus painted green meadow zones
+// so the grass carpet sits on matching ground color.
+function makeGroundTexture(rand, meadows, corridor) {
   const c = document.createElement('canvas');
-  c.width = c.height = 1024;
+  c.width = c.height = TEX_SIZE;
   const ctx = c.getContext('2d');
-  const grad = ctx.createRadialGradient(512, 512, 60, 512, 512, 760);
+  const grad = ctx.createRadialGradient(
+    TEX_SIZE / 2, TEX_SIZE / 2, 100,
+    TEX_SIZE / 2, TEX_SIZE / 2, TEX_SIZE * 0.74
+  );
   grad.addColorStop(0, '#f8ecd0');
   grad.addColorStop(0.55, '#f0deb4');
   grad.addColorStop(1, '#e6c894');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1024, 1024);
-  for (let i = 0; i < 70; i++) {
+  ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+  for (let i = 0; i < 110; i++) {
     ctx.fillStyle = `rgba(${rand() > 0.5 ? '185,150,105' : '255,250,230'},0.05)`;
     ctx.beginPath();
-    ctx.arc(rand() * 1024, rand() * 1024, 10 + rand() * 38, 0, Math.PI * 2);
+    ctx.arc(rand() * TEX_SIZE, rand() * TEX_SIZE, 18 + rand() * 70, 0, Math.PI * 2);
     ctx.fill();
   }
-  for (let i = 0; i < 2600; i++) {
+  for (let i = 0; i < 5200; i++) {
     ctx.fillStyle = `rgba(150,115,80,${0.03 + rand() * 0.05})`;
-    ctx.fillRect(rand() * 1024, rand() * 1024, 1.6, 1.6);
+    ctx.fillRect(rand() * TEX_SIZE, rand() * TEX_SIZE, 2.2, 2.2);
+  }
+  // Worn path tint along the rail corridor.
+  for (const p of corridor) {
+    const [px, py] = worldToPx(p.x, p.z);
+    ctx.fillStyle = 'rgba(140,100,70,0.045)';
+    ctx.beginPath();
+    ctx.arc(px, py, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Meadow zones: layered soft green gradients.
+  for (const m of meadows) {
+    const [px, py] = worldToPx(m.x, m.z);
+    const pr = (m.r / GROUND_SIZE) * TEX_SIZE;
+    for (const [scale, alpha] of [[1.25, 0.35], [0.85, 0.5]]) {
+      const g = ctx.createRadialGradient(px, py, 0, px, py, pr * scale);
+      g.addColorStop(0, `rgba(151,186,98,${alpha})`);
+      g.addColorStop(0.7, `rgba(160,190,110,${alpha * 0.6})`);
+      g.addColorStop(1, 'rgba(160,190,110,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, pr * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
+}
+
+// Three crossed triangles with normals forced straight up so each clump
+// shades like the ground beneath it — Bruno-style stylized grass.
+function grassGeometry() {
+  const verts = [];
+  for (let i = 0; i < 3; i++) {
+    const a = (i * Math.PI) / 3;
+    const dx = Math.cos(a);
+    const dz = Math.sin(a);
+    const w = 0.3;
+    const h = 0.95;
+    const lean = 0.16;
+    verts.push(-dx * w, 0, -dz * w, dx * w, 0, dz * w, dx * lean, h, dz * lean);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const normals = new Float32Array(verts.length);
+  for (let i = 1; i < normals.length; i += 3) normals[i] = 1;
+  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  return geo;
 }
 
 // Cone with jittered side vertices for a hand-modelled faceted silhouette.
@@ -108,18 +165,82 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
     }
   };
 
+  // Meadow zones hugging the corridor — painted onto the ground texture and
+  // filled with instanced grass below. One guaranteed meadow flanks every
+  // station (where riders actually stop and look), plus random ones between.
+  const meadows = [];
+  const UPv = new THREE.Vector3(0, 1, 0);
+  for (const d of stationDistances) {
+    const t = d / trackLength;
+    const p = curve.getPointAt(t);
+    const n = UPv.clone().cross(curve.getTangentAt(t)).normalize();
+    for (const side of [1, -1]) {
+      meadows.push({
+        x: p.x + n.x * side * (17 + rand() * 6),
+        z: p.z + n.z * side * (17 + rand() * 6),
+        r: 12 + rand() * 8
+      });
+    }
+  }
+  {
+    let guard = 0;
+    while (meadows.length < 30 && guard < 500) {
+      guard++;
+      const p = corridor[Math.floor(rand() * corridor.length)];
+      const a = rand() * Math.PI * 2;
+      const off = 10 + rand() * 38;
+      const x = p.x + Math.cos(a) * off;
+      const z = p.z + Math.sin(a) * off;
+      const r = 9 + rand() * 13;
+      if (meadows.some((m) => (m.x - x) ** 2 + (m.z - z) ** 2 < (m.r + r) ** 2 * 0.5)) continue;
+      meadows.push({ x, z, r });
+    }
+  }
+
   // Ground.
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(1700, 1700),
-    new THREE.MeshLambertMaterial({ map: makeGroundTexture(rand) })
+    new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+    new THREE.MeshLambertMaterial({ map: makeGroundTexture(rand, meadows, corridor) })
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(0, 0, -300);
+  ground.position.set(0, 0, GROUND_CENTER_Z);
   ground.receiveShadow = true;
   scene.add(ground);
 
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
+
+  // Station platforms sit beside these points; keep the grass carpet off them.
+  const stationPoints = stationDistances.map((d) => curve.getPointAt(d / trackLength));
+  const nearStation = (x, z, minDist) =>
+    stationPoints.some((p) => (p.x - x) ** 2 + (p.z - z) ** 2 < minDist * minDist);
+
+  // Grass carpet filling the meadows.
+  const GRASS_MAX = 9000;
+  const grassMat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const grass = new THREE.InstancedMesh(grassGeometry(), grassMat, GRASS_MAX);
+  let g = 0;
+  for (const m of meadows) {
+    const want = Math.floor(m.r * m.r * Math.PI * 0.55);
+    for (let i = 0; i < want && g < GRASS_MAX; i++) {
+      const a = rand() * Math.PI * 2;
+      const rr = m.r * Math.sqrt(rand()) * 0.96;
+      const x = m.x + Math.cos(a) * rr;
+      const z = m.z + Math.sin(a) * rr;
+      if (!clearOf(x, z, 3) || nearStation(x, z, 13)) continue;
+      dummy.position.set(x, 0, z);
+      dummy.scale.setScalar(0.65 + rand() * 0.8);
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.updateMatrix();
+      grass.setMatrixAt(g, dummy.matrix);
+      tint.setHSL(0.16 + rand() * 0.14, 0.5 + rand() * 0.15, 0.4 + rand() * 0.2);
+      grass.setColorAt(g, tint);
+      g++;
+    }
+  }
+  grass.count = g;
+  grass.receiveShadow = true;
+  scene.add(grass);
 
   // --- pines: trunk + three stacked cones sharing one matrix per tree -------
   const PINES = 170;
@@ -146,31 +267,45 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
     scene.add(part);
   }
 
-  // --- puffball trees -------------------------------------------------------
+  // --- fluffy blob trees: 5 clustered blobs per canopy, some autumn-colored --
   const PUFFS = 130;
+  const BLOBS_PER = 5;
+  const accentHues = [0.06, 0.1, 0.78, 0.92]; // orange, amber, purple, pink
   const puffTrunks = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.16, 0.24, 1.9, 6).translate(0, 0.95, 0),
+    new THREE.CylinderGeometry(0.16, 0.26, 2.2, 6).translate(0, 1.1, 0),
     lambert(0x8a6248),
     PUFFS
   );
-  const puffTops = new THREE.InstancedMesh(
-    new THREE.IcosahedronGeometry(1.5, 0).translate(0, 2.9, 0),
-    lambert(0x7bc47f, true),
-    PUFFS
+  const puffBlobs = new THREE.InstancedMesh(
+    new THREE.IcosahedronGeometry(1.0, 0),
+    lambert(0xffffff, true),
+    PUFFS * BLOBS_PER
   );
   scatter(PUFFS, 9, 140, (x, z, i) => {
     const s = 0.7 + rand() * 1.2;
     dummy.position.set(x, 0, z);
-    dummy.scale.set(s, s * (0.9 + rand() * 0.3), s);
+    dummy.scale.setScalar(s);
     dummy.rotation.y = rand() * Math.PI * 2;
     dummy.updateMatrix();
     puffTrunks.setMatrixAt(i, dummy.matrix);
-    puffTops.setMatrixAt(i, dummy.matrix);
-    tint.setHSL(0.27 + rand() * 0.12, 0.5, 0.46 + rand() * 0.14);
-    puffTops.setColorAt(i, tint);
+    const autumn = rand() < 0.3;
+    const baseH = autumn ? accentHues[Math.floor(rand() * accentHues.length)] : 0.25 + rand() * 0.12;
+    const baseS = autumn ? 0.52 + rand() * 0.12 : 0.48 + rand() * 0.12;
+    const baseL = 0.5 + rand() * 0.1;
+    for (let j = 0; j < BLOBS_PER; j++) {
+      const a = rand() * Math.PI * 2;
+      const rr = rand() * 1.05 * s;
+      dummy.position.set(x + Math.cos(a) * rr, (2.5 + (rand() - 0.3) * 1.3) * s, z + Math.sin(a) * rr);
+      dummy.scale.setScalar((0.75 + rand() * 0.6) * s);
+      dummy.rotation.set(rand() * Math.PI, rand() * Math.PI, 0);
+      dummy.updateMatrix();
+      puffBlobs.setMatrixAt(i * BLOBS_PER + j, dummy.matrix);
+      tint.setHSL(baseH, baseS, baseL + (rand() - 0.5) * 0.13);
+      puffBlobs.setColorAt(i * BLOBS_PER + j, tint);
+    }
   });
-  puffTrunks.castShadow = puffTops.castShadow = true;
-  scene.add(puffTrunks, puffTops);
+  puffTrunks.castShadow = puffBlobs.castShadow = true;
+  scene.add(puffTrunks, puffBlobs);
 
   // --- bushes ----------------------------------------------------------------
   const BUSHES = 90;
@@ -187,21 +322,6 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
   });
   bushes.castShadow = true;
   scene.add(bushes);
-
-  // --- grass tufts and flowers near the line ---------------------------------
-  const GRASS = 380;
-  const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.11, 0.55, 5), lambert(0x7fb069, true), GRASS);
-  scatterNear(GRASS, 3.4, 26, (x, z, i) => {
-    const s = 0.6 + rand() * 1.1;
-    dummy.position.set(x, 0.22 * s, z);
-    dummy.scale.setScalar(s);
-    dummy.rotation.set((rand() - 0.5) * 0.35, rand() * Math.PI, (rand() - 0.5) * 0.35);
-    dummy.updateMatrix();
-    grass.setMatrixAt(i, dummy.matrix);
-    tint.setHSL(0.26 + rand() * 0.09, 0.5, 0.42 + rand() * 0.16);
-    grass.setColorAt(i, tint);
-  });
-  scene.add(grass);
 
   const FLOWERS = 160;
   const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.025, 0.025, 0.4, 4).translate(0, 0.2, 0), lambert(0x5e9e54), FLOWERS);
@@ -319,12 +439,12 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
   while (mountainsPlaced < 14 && mountainGuard < 300) {
     mountainGuard++;
     const angle = rand() * Math.PI * 2;
-    const r = 175 + rand() * 165;
+    const r = 190 + rand() * 170;
     const x = Math.cos(angle) * r;
     const z = -300 + Math.sin(angle) * r;
     if (!clearOf(x, z, 110)) continue;
     mountainsPlaced++;
-    const h = 45 + rand() * 90;
+    const h = 38 + rand() * 62;
     const base = 35 + rand() * 50;
     const m = new THREE.Mesh(ruggedCone(base, h, 6, rand), mountainMat);
     m.position.set(x, h / 2 - 1, z);
