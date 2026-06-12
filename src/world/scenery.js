@@ -254,7 +254,7 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
     const s = 0.6 + rand() * 1.3;
     dummy.position.set(x, 0, z);
     dummy.scale.setScalar(s);
-    dummy.rotation.y = rand() * Math.PI * 2;
+    dummy.rotation.set(0, rand() * Math.PI * 2, 0);
     dummy.updateMatrix();
     tint.setHSL(0.32 + rand() * 0.07, 0.5, 0.42 + rand() * 0.16);
     for (const part of pineParts) {
@@ -285,7 +285,7 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
     const s = 0.7 + rand() * 1.2;
     dummy.position.set(x, 0, z);
     dummy.scale.setScalar(s);
-    dummy.rotation.y = rand() * Math.PI * 2;
+    dummy.rotation.set(0, rand() * Math.PI * 2, 0); // full reset: blob loop below tilts X
     dummy.updateMatrix();
     puffTrunks.setMatrixAt(i, dummy.matrix);
     const autumn = rand() < 0.3;
@@ -314,7 +314,7 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
     const s = 0.5 + rand() * 0.9;
     dummy.position.set(x, s * 0.5, z);
     dummy.scale.set(s, s * 0.65, s);
-    dummy.rotation.y = rand() * Math.PI * 2;
+    dummy.rotation.set(0, rand() * Math.PI * 2, 0);
     dummy.updateMatrix();
     bushes.setMatrixAt(i, dummy.matrix);
     tint.setHSL(0.28 + rand() * 0.1, 0.48, 0.45 + rand() * 0.15);
