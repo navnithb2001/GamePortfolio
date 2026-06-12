@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Navnith Bharadwaj — Software Engineer</title>
+    <meta name="description" content="Interactive train-ride portfolio of Navnith Bharadwaj — backend, distributed systems, and ML platforms. Hop on and ride through education, experience, skills, projects, and contact." />
+    <meta name="theme-color" content="#fdf3e3" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div id="ui">
+      <header id="badge">
+        <h1>Navnith Bharadwaj</h1>
+        <p>Software Engineer</p>
+      </header>
+
+      <nav id="route-map" aria-label="Station route map"></nav>
+
+      <aside id="card" aria-live="polite">
+        <div id="card-inner"></div>
+      </aside>
+
+      <div id="hint">
+        <span class="key-row"><kbd>↑</kbd></span>
+        <span class="key-row"><kbd>↓</kbd></span>
+        <p>drive the train</p>
+      </div>
+
+      <div id="touch-controls">
+        <button id="btn-fwd" aria-label="Accelerate">▲</button>
+        <button id="btn-back" aria-label="Reverse">▼</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

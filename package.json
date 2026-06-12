@@ -1,0 +1,16 @@
+{
+  "name": "game-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Navnith Bharadwaj — interactive train-ride portfolio",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.184.0",
+    "vite": "8.0.16"
+  }
+}
