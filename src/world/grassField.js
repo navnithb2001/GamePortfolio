@@ -15,43 +15,32 @@ const worldToMaskPx = (x, z) => [
   ((z - GROUND_CENTER.y) / GROUND_SIZE + 0.5) * MASK_TEX
 ];
 
-// White where grass grows (meadows), erased along the rail corridor and
-// station platforms so blades never poke through rails or pads.
+// The grass tile follows the train and is as wide as the near-track land, so
+// grass fills everywhere by default — we only carve out the rail line and the
+// station platforms so blades don't stab through them. A soft speckle keeps a
+// little density variation so the lawn isn't perfectly uniform.
 function makeMaskTexture(meadows, corridor, stationPoints) {
   const c = document.createElement('canvas');
   c.width = c.height = MASK_TEX;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, MASK_TEX, MASK_TEX);
-
   const pxPerWorld = MASK_TEX / GROUND_SIZE;
 
-  // Continuous grass band carpeting the land along the whole track, so the
-  // ground reads lush like Bruno's world rather than bare between meadows.
-  ctx.strokeStyle = '#fff';
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 78 * pxPerWorld;
-  ctx.beginPath();
-  corridor.forEach((p, i) => {
-    const [px, py] = worldToMaskPx(p.x, p.z);
-    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-  });
-  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, MASK_TEX, MASK_TEX);
 
-  // Extra-dense meadow cores on top.
-  for (const m of meadows) {
-    const [px, py] = worldToMaskPx(m.x, m.z);
-    const pr = m.r * pxPerWorld;
-    ctx.fillStyle = 'rgba(255,255,255,1)';
+  // Subtle thinning patches for natural density variation.
+  for (let i = 0; i < 900; i++) {
+    ctx.fillStyle = `rgba(0,0,0,${0.05 + Math.random() * 0.12})`;
     ctx.beginPath();
-    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.arc(Math.random() * MASK_TEX, Math.random() * MASK_TEX, 6 + Math.random() * 16, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Erase the rail line itself so blades don't poke through the track.
+  // Erase the rail line itself.
   ctx.strokeStyle = '#000';
-  ctx.lineWidth = 4.4 * pxPerWorld;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4.6 * pxPerWorld;
   ctx.beginPath();
   corridor.forEach((p, i) => {
     const [px, py] = worldToMaskPx(p.x, p.z);
@@ -64,7 +53,7 @@ function makeMaskTexture(meadows, corridor, stationPoints) {
   for (const p of stationPoints) {
     const [px, py] = worldToMaskPx(p.x, p.z);
     ctx.beginPath();
-    ctx.arc(px, py, 13 * pxPerWorld, 0, Math.PI * 2);
+    ctx.arc(px, py, 12 * pxPerWorld, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -76,8 +65,10 @@ function makeMaskTexture(meadows, corridor, stationPoints) {
 }
 
 export function createGrassField(scene, { meadows, corridor, stationPoints, fog }) {
-  const SIZE = 92;
-  const SUB = 200;
+  // Dense, short lawn that follows the train. Small tile + high subdivision =
+  // tightly packed blades that read as a continuous carpet, not scattered weeds.
+  const SIZE = 74;
+  const SUB = 380;
   const count = SUB * SUB;
   const frag = SIZE / SUB;
 
@@ -114,8 +105,8 @@ export function createGrassField(scene, { meadows, corridor, stationPoints, fog 
     uCenter: { value: new THREE.Vector2() },
     uTime: { value: 0 },
     uSize: { value: SIZE },
-    uBladeWidth: { value: 0.13 },
-    uBladeHeight: { value: 1.05 },
+    uBladeWidth: { value: 0.1 },
+    uBladeHeight: { value: 0.82 },
     uCamera: { value: new THREE.Vector3() },
     uMask: { value: maskTexture },
     uMaskCenter: { value: GROUND_CENTER.clone() },
@@ -176,8 +167,10 @@ export function createGrassField(scene, { meadows, corridor, stationPoints, fog 
         float tip = step(aVid, 0.5);
         vTip = tip;
 
-        float heightVar = vnoise(worldXZ * 0.35) * 0.7 + 0.5;
-        float height = uBladeHeight * (0.45 + 0.55 * aRand) * heightVar * grass;
+        // Gentle, low-frequency height variation — no bald patches or stray
+        // tall tufts, just a softly undulating even lawn.
+        float heightVar = vnoise(worldXZ * 0.06) * 0.3 + 0.82;
+        float height = uBladeHeight * (0.7 + 0.3 * aRand) * heightVar * grass;
 
         // Blade triangle: tip up, two base corners spread by width.
         float sx = (aVid < 0.5) ? 0.0 : (aVid < 1.5 ? 1.0 : -1.0);
