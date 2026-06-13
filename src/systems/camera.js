@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { pointAt, tangentAt } from '../world/track.js';
 
-const CHASE_BACK = 17.5;
-const CHASE_UP = 9.8;
-const LOOK_AHEAD = 7;
+const CHASE_BACK = 14.2;
+const CHASE_UP = 7.4;
+const LOOK_AHEAD = 8.5;
 
 export function createChaseCamera(curve, trackLength, startDistance) {
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1600);
-  let baseFov = 50;
+  const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 1600);
+  let baseFov = 46;
 
   const trainPos = new THREE.Vector3();
   const tangent = new THREE.Vector3();
@@ -26,7 +26,7 @@ export function createChaseCamera(curve, trackLength, startDistance) {
 
   function resize() {
     camera.aspect = window.innerWidth / window.innerHeight;
-    baseFov = camera.aspect < 0.8 ? 64 : 50; // wider view in portrait
+    baseFov = camera.aspect < 0.8 ? 60 : 46; // wider view in portrait
     camera.updateProjectionMatrix();
   }
 
@@ -34,7 +34,7 @@ export function createChaseCamera(curve, trackLength, startDistance) {
   resize();
   camera.fov = baseFov;
   computeDesired(startDistance);
-  camera.position.copy(desired).add(new THREE.Vector3(26, 30, 30));
+  camera.position.copy(desired).add(new THREE.Vector3(18, 18, 20));
   smoothedLook.copy(lookTarget);
   camera.lookAt(smoothedLook);
 

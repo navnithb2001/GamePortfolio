@@ -115,8 +115,8 @@ export async function loadFolioAssets() {
 
 // Bruno's leaf-color pairs (shaded → lit), from World.js / Bushes.js.
 export const TREE_COLORS = {
-  oak: ['#7c8c2e', '#b4b536'],
-  cherry: ['#e05a7a', '#ff9990'],
-  birch: ['#c98a2e', '#d8cf3b']
+  oak: ['#b4b536', '#d8cf3b'],
+  cherry: ['#ff6d6d', '#ff9990'],
+  birch: ['#ff4f2b', '#ff903f']
 };
-export const BUSH_COLORS = ['#8a9a2e', '#cfd23b'];
+export const BUSH_COLORS = ['#b4b536', '#d8cf3b'];

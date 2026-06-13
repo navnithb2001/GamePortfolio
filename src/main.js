@@ -15,7 +15,7 @@ import { createZones } from './systems/zones.js';
 import { createPostFX } from './systems/postfx.js';
 import { createOverlay } from './ui/overlay.js';
 
-const SKY = 0xffe0b5; // horizon color; the dome carries the full gradient
+const SKY = 0x9b89ff; // horizon color; the dome carries the full gradient
 
 // --- renderer / scene -------------------------------------------------------
 const canvas = document.getElementById('scene');
@@ -31,16 +31,15 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY);
 scene.fog = new THREE.Fog(SKY, 130, 430);
 
-// Gradient sky dome: warm peach horizon rising into soft lavender.
+// Gradient sky dome: Bruno Simon's folio default fog/sky.
 {
   const c = document.createElement('canvas');
   c.width = 2;
   c.height = 512;
   const ctx = c.getContext('2d');
   const grad = ctx.createLinearGradient(0, 512, 0, 0);
-  grad.addColorStop(0, '#ffe3b8');
-  grad.addColorStop(0.42, '#ffd9c0');
-  grad.addColorStop(1, '#bfcdf4');
+  grad.addColorStop(0, '#00ffff');
+  grad.addColorStop(1, '#9b89ff');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 2, 512);
   const tex = new THREE.CanvasTexture(c);
@@ -76,6 +75,7 @@ const grass = createGrassField(scene, {
   meadows: scenery.meadows,
   corridor: scenery.corridor,
   stationPoints: scenery.stationPoints,
+  ponds: scenery.ponds,
   fog: scene.fog
 });
 const lights = createLights(scene);

@@ -3,10 +3,10 @@ import * as THREE from 'three';
 export function createLights(scene) {
   // Lavender ground bounce tints shadowed faces purple against the warm sun —
   // the contrast that gives Bruno-style low-poly scenes their depth.
-  const hemi = new THREE.HemisphereLight(0xfff3dc, 0xb09ed6, 0.75);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x6d3fff, 1.2);
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xffedd0, 2.1);
+  const sun = new THREE.DirectionalLight(0xffd2c2, 2.1);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   // Tight frustum that follows the train so shadows stay crisp.
