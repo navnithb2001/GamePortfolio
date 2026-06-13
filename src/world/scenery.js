@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { buildCanopyGeometry, createFoliageMaterial } from './foliage.js';
+import { TREE_COLORS, BUSH_COLORS } from './folioAssets.js';
 
 // Deterministic RNG so the world looks identical every visit.
 function mulberry32(seed) {
@@ -50,14 +52,19 @@ function makeGroundTexture(rand, meadows, corridor) {
     ctx.fillStyle = `rgba(150,115,80,${0.03 + rand() * 0.05})`;
     ctx.fillRect(rand() * TEX_SIZE, rand() * TEX_SIZE, 2.2, 2.2);
   }
-  // Worn path tint along the rail corridor.
-  for (const p of corridor) {
+  // Green ground band along the corridor so the soil under the grass field
+  // reads green (matches the grass mask band in grassField.js).
+  const bandPx = (78 / GROUND_SIZE) * TEX_SIZE * 0.5;
+  ctx.strokeStyle = 'rgba(150,180,96,0.62)';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = bandPx;
+  ctx.beginPath();
+  corridor.forEach((p, i) => {
     const [px, py] = worldToPx(p.x, p.z);
-    ctx.fillStyle = 'rgba(140,100,70,0.045)';
-    ctx.beginPath();
-    ctx.arc(px, py, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  });
+  ctx.stroke();
   // Meadow zones: layered soft green gradients.
   for (const m of meadows) {
     const [px, py] = worldToPx(m.x, m.z);
@@ -79,26 +86,6 @@ function makeGroundTexture(rand, meadows, corridor) {
   return tex;
 }
 
-// Three crossed triangles with normals forced straight up so each clump
-// shades like the ground beneath it — Bruno-style stylized grass.
-function grassGeometry() {
-  const verts = [];
-  for (let i = 0; i < 3; i++) {
-    const a = (i * Math.PI) / 3;
-    const dx = Math.cos(a);
-    const dz = Math.sin(a);
-    const w = 0.3;
-    const h = 0.95;
-    const lean = 0.16;
-    verts.push(-dx * w, 0, -dz * w, dx * w, 0, dz * w, dx * lean, h, dz * lean);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  const normals = new Float32Array(verts.length);
-  for (let i = 1; i < normals.length; i += 3) normals[i] = 1;
-  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-  return geo;
-}
 
 // Cone with jittered side vertices for a hand-modelled faceted silhouette.
 function ruggedCone(radius, height, segments, rand, jitter = 0.1) {
@@ -121,7 +108,7 @@ function ruggedCone(radius, height, segments, rand, jitter = 0.1) {
   return geo;
 }
 
-export function createScenery(scene, curve, trackLength, stationDistances) {
+export function createScenery(scene, curve, trackLength, stationDistances, assets) {
   const rand = mulberry32(20260612);
 
   // Corridor samples used to keep props off the line.
@@ -210,117 +197,78 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
 
-  // Station platforms sit beside these points; keep the grass carpet off them.
   const stationPoints = stationDistances.map((d) => curve.getPointAt(d / trackLength));
-  const nearStation = (x, z, minDist) =>
-    stationPoints.some((p) => (p.x - x) ** 2 + (p.z - z) ** 2 < minDist * minDist);
 
-  // Grass carpet filling the meadows.
-  const GRASS_MAX = 9000;
-  const grassMat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const grass = new THREE.InstancedMesh(grassGeometry(), grassMat, GRASS_MAX);
-  let g = 0;
-  for (const m of meadows) {
-    const want = Math.floor(m.r * m.r * Math.PI * 0.55);
-    for (let i = 0; i < want && g < GRASS_MAX; i++) {
-      const a = rand() * Math.PI * 2;
-      const rr = m.r * Math.sqrt(rand()) * 0.96;
-      const x = m.x + Math.cos(a) * rr;
-      const z = m.z + Math.sin(a) * rr;
-      if (!clearOf(x, z, 3) || nearStation(x, z, 13)) continue;
-      dummy.position.set(x, 0, z);
-      dummy.scale.setScalar(0.65 + rand() * 0.8);
-      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
-      dummy.updateMatrix();
-      grass.setMatrixAt(g, dummy.matrix);
-      tint.setHSL(0.16 + rand() * 0.14, 0.5 + rand() * 0.15, 0.4 + rand() * 0.2);
-      grass.setColorAt(g, tint);
-      g++;
-    }
-  }
-  grass.count = g;
-  grass.receiveShadow = true;
-  scene.add(grass);
-
-  // --- pines: trunk + three stacked cones sharing one matrix per tree -------
-  const PINES = 170;
-  const pineParts = [
-    new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.26, 1.4, 6).translate(0, 0.7, 0), lambert(0x8a6248), PINES),
-    new THREE.InstancedMesh(new THREE.ConeGeometry(1.6, 1.9, 6).translate(0, 2.2, 0), lambert(0x6cc06f, true), PINES),
-    new THREE.InstancedMesh(new THREE.ConeGeometry(1.15, 1.6, 6).translate(0, 3.35, 0), lambert(0x6cc06f, true), PINES),
-    new THREE.InstancedMesh(new THREE.ConeGeometry(0.7, 1.3, 6).translate(0, 4.35, 0), lambert(0x6cc06f, true), PINES)
-  ];
-  scatter(PINES, 9, 140, (x, z, i) => {
-    const s = 0.6 + rand() * 1.3;
+  // --- Bruno Simon trees: instanced trunks + foliage canopies per species ----
+  // The shared canopy geometry (an 80-quad sphere) is instanced once per leaf
+  // anchor of every tree; each instance matrix = treePlacement * anchorMatrix.
+  const canopyGeo = buildCanopyGeometry(7, 72);
+  const TREE_TOTAL = 150;
+  const speciesPick = ['oak', 'oak', 'oak', 'cherry', 'cherry', 'birch'];
+  const placements = { oak: [], cherry: [], birch: [] };
+  scatter(TREE_TOTAL, 10, 150, (x, z) => {
+    const sp = speciesPick[Math.floor(rand() * speciesPick.length)];
+    const s = 0.5 + rand() * 0.45;
     dummy.position.set(x, 0, z);
     dummy.scale.setScalar(s);
     dummy.rotation.set(0, rand() * Math.PI * 2, 0);
     dummy.updateMatrix();
-    tint.setHSL(0.32 + rand() * 0.07, 0.5, 0.42 + rand() * 0.16);
-    for (const part of pineParts) {
-      part.setMatrixAt(i, dummy.matrix);
-      if (part !== pineParts[0]) part.setColorAt(i, tint);
-    }
+    placements[sp].push(dummy.matrix.clone());
   });
-  for (const part of pineParts) {
-    part.castShadow = true;
-    scene.add(part);
+
+  const tmpMat = new THREE.Matrix4();
+  for (const sp of ['oak', 'cherry', 'birch']) {
+    const data = assets.trees[sp];
+    const mats = placements[sp];
+    if (!mats.length || !data) continue;
+
+    const trunks = new THREE.InstancedMesh(data.body, assets.paletteMat, mats.length);
+    trunks.castShadow = true;
+    trunks.receiveShadow = true;
+    mats.forEach((m, i) => trunks.setMatrixAt(i, m));
+    scene.add(trunks);
+
+    const [colorA, colorB] = TREE_COLORS[sp];
+    const { material, depthMaterial } = createFoliageMaterial({
+      colorA,
+      colorB,
+      foliageTexture: assets.foliageTexture
+    });
+    const canopies = new THREE.InstancedMesh(canopyGeo, material, mats.length * data.anchors.length);
+    canopies.customDepthMaterial = depthMaterial;
+    canopies.castShadow = true;
+    canopies.receiveShadow = true;
+    let k = 0;
+    for (const tm of mats) {
+      for (const anchor of data.anchors) {
+        tmpMat.multiplyMatrices(tm, anchor);
+        canopies.setMatrixAt(k++, tmpMat);
+      }
+    }
+    scene.add(canopies);
   }
 
-  // --- fluffy blob trees: 5 clustered blobs per canopy, some autumn-colored --
-  const PUFFS = 130;
-  const BLOBS_PER = 5;
-  const accentHues = [0.06, 0.1, 0.78, 0.92]; // orange, amber, purple, pink
-  const puffTrunks = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.16, 0.26, 2.2, 6).translate(0, 1.1, 0),
-    lambert(0x8a6248),
-    PUFFS
-  );
-  const puffBlobs = new THREE.InstancedMesh(
-    new THREE.IcosahedronGeometry(1.0, 0),
-    lambert(0xffffff, true),
-    PUFFS * BLOBS_PER
-  );
-  scatter(PUFFS, 9, 140, (x, z, i) => {
-    const s = 0.7 + rand() * 1.2;
-    dummy.position.set(x, 0, z);
-    dummy.scale.setScalar(s);
-    dummy.rotation.set(0, rand() * Math.PI * 2, 0); // full reset: blob loop below tilts X
-    dummy.updateMatrix();
-    puffTrunks.setMatrixAt(i, dummy.matrix);
-    const autumn = rand() < 0.3;
-    const baseH = autumn ? accentHues[Math.floor(rand() * accentHues.length)] : 0.25 + rand() * 0.12;
-    const baseS = autumn ? 0.52 + rand() * 0.12 : 0.48 + rand() * 0.12;
-    const baseL = 0.5 + rand() * 0.1;
-    for (let j = 0; j < BLOBS_PER; j++) {
-      const a = rand() * Math.PI * 2;
-      const rr = rand() * 1.05 * s;
-      dummy.position.set(x + Math.cos(a) * rr, (2.5 + (rand() - 0.3) * 1.3) * s, z + Math.sin(a) * rr);
-      dummy.scale.setScalar((0.75 + rand() * 0.6) * s);
-      dummy.rotation.set(rand() * Math.PI, rand() * Math.PI, 0);
-      dummy.updateMatrix();
-      puffBlobs.setMatrixAt(i * BLOBS_PER + j, dummy.matrix);
-      tint.setHSL(baseH, baseS, baseL + (rand() - 0.5) * 0.13);
-      puffBlobs.setColorAt(i * BLOBS_PER + j, tint);
-    }
+  // --- bushes: trunk-less foliage clumps hugging the line ---------------------
+  const BUSHES = 110;
+  const bushMat = createFoliageMaterial({
+    colorA: BUSH_COLORS[0],
+    colorB: BUSH_COLORS[1],
+    foliageTexture: assets.foliageTexture
   });
-  puffTrunks.castShadow = puffBlobs.castShadow = true;
-  scene.add(puffTrunks, puffBlobs);
-
-  // --- bushes ----------------------------------------------------------------
-  const BUSHES = 90;
-  const bushes = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.9, 0), lambert(0x8fcc7a, true), BUSHES);
-  scatterNear(BUSHES, 6, 50, (x, z, i) => {
-    const s = 0.5 + rand() * 0.9;
-    dummy.position.set(x, s * 0.5, z);
-    dummy.scale.set(s, s * 0.65, s);
-    dummy.rotation.set(0, rand() * Math.PI * 2, 0);
-    dummy.updateMatrix();
-    bushes.setMatrixAt(i, dummy.matrix);
-    tint.setHSL(0.28 + rand() * 0.1, 0.48, 0.45 + rand() * 0.15);
-    bushes.setColorAt(i, tint);
-  });
+  const bushes = new THREE.InstancedMesh(canopyGeo, bushMat.material, BUSHES);
+  bushes.customDepthMaterial = bushMat.depthMaterial;
   bushes.castShadow = true;
+  bushes.receiveShadow = true;
+  let bushCount = 0;
+  scatterNear(BUSHES, 6, 52, (x, z) => {
+    const s = 0.8 + rand() * 0.9;
+    dummy.position.set(x, s * 0.7, z);
+    dummy.scale.set(s, s * 0.8, s);
+    dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+    dummy.updateMatrix();
+    bushes.setMatrixAt(bushCount++, dummy.matrix);
+  });
+  bushes.count = bushCount;
   scene.add(bushes);
 
   const FLOWERS = 160;
@@ -510,5 +458,5 @@ export function createScenery(scene, curve, trackLength, stationDistances) {
     }
   }
 
-  return { update };
+  return { update, meadows, corridor, stationPoints };
 }

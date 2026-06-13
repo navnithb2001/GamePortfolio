@@ -1,0 +1,15 @@
+These graphics are from Bruno Simon's folio-2025 project (MIT licensed).
+
+Source:   https://github.com/brunosimon/folio-2025
+Commit:   41046b57eeed8d156d9c3fd7fa259900baef7816
+License:  MIT — full text in LICENSE.md
+
+Files (from his static/ directory):
+  oakTreesVisual.glb, cherryTreesVisual.glb, birchTreesVisual.glb
+    — Draco compression removed (decoded to plain glTF) so no runtime
+      Draco decoder is needed; geometry/materials otherwise unchanged.
+  foliageSDF.png  — leaf alpha cutout
+  benches.glb, lanterns.glb  — platform props
+  palette.png  — swatch atlas his models' UVs index into
+
+Used under the terms of the MIT license. Thanks, Bruno.

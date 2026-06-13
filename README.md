@@ -21,9 +21,20 @@ Deep links: `?at=education`, `?at=contact`, … start the ride at a station.
 ## Tech
 
 - [Three.js](https://threejs.org/) + [Vite](https://vite.dev/), vanilla JS — no framework
-- Zero external assets: all geometry is procedural, all text is canvas-generated
-  (~140 kB gzipped total, loads instantly)
+- World built from a mix of procedural geometry (track, train, stations, terrain,
+  post-processing grade) and borrowed graphics (see Credits)
 - Portfolio content lives in one file: [`src/content.js`](src/content.js)
+
+## Credits
+
+The trees, foliage, grass, bench, and lantern graphics are adapted from
+**Bruno Simon's** [folio-2025](https://github.com/brunosimon/folio-2025)
+(MIT licensed — see [`public/folio-assets/LICENSE.md`](public/folio-assets/LICENSE.md)).
+The tree/prop models and the leaf SDF are his original assets; the foliage and
+grass techniques (sphere-of-quads canopies, a camera-following billboarded
+blade field) are ported from his `three/webgpu` + TSL source to classic
+WebGL/three.js here. Huge thanks to Bruno — go see the real thing at
+[bruno-simon.com](https://bruno-simon.com/).
 
 ## Develop
 

@@ -5,6 +5,8 @@ import { createTrack } from './world/track.js';
 import { createTrain } from './world/train.js';
 import { createStations } from './world/stations.js';
 import { createScenery } from './world/scenery.js';
+import { createGrassField } from './world/grassField.js';
+import { loadFolioAssets } from './world/folioAssets.js';
 import { createLights } from './world/lights.js';
 import { createControls } from './systems/controls.js';
 import { createMovement } from './systems/movement.js';
@@ -64,8 +66,18 @@ const stationDefs = STATIONS.map((def, i) => ({
 }));
 const stationDistances = stationDefs.map((s) => s.distance);
 
-const builtStations = createStations(scene, curve, trackLength, stationDefs);
-const scenery = createScenery(scene, curve, trackLength, stationDistances);
+// Bruno Simon's borrowed graphics (trees, foliage, props) — tiny GLB/PNG
+// files, so this resolves almost instantly while the UI is already on screen.
+const assets = await loadFolioAssets();
+
+const builtStations = createStations(scene, curve, trackLength, stationDefs, assets);
+const scenery = createScenery(scene, curve, trackLength, stationDistances, assets);
+const grass = createGrassField(scene, {
+  meadows: scenery.meadows,
+  corridor: scenery.corridor,
+  stationPoints: scenery.stationPoints,
+  fog: scene.fog
+});
 const lights = createLights(scene);
 const train = createTrain(scene, curve, trackLength);
 
@@ -139,6 +151,7 @@ renderer.setAnimationLoop(() => {
   trainPos.copy(train.loco.position);
   lights.update(trainPos);
   scenery.update(dt, time);
+  grass.update(trainPos, camera, time);
 
   // debug: ?cam=x,y,z,tx,ty,tz pins the camera
   const camOverride = params.get('cam');

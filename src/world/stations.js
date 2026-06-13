@@ -50,7 +50,7 @@ function makeGroundTexture(name) {
 }
 
 // Builds one station (platform, building, sign) facing local +Z toward the track.
-function buildStation(name, color) {
+function buildStation(name, color, assets) {
   const g = new THREE.Group();
   const accent = lambert(color);
 
@@ -108,27 +108,29 @@ function buildStation(name, color) {
   }
   g.add(signGroup);
 
-  // Warm glowing platform lamps.
-  for (const x of [-6.8, 6.8]) {
-    const lampPole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 2.5, 6), lambert(DARK));
-    lampPole.position.set(x, 2.15, 4.2);
-    g.add(lampPole);
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 8, 6),
-      new THREE.MeshLambertMaterial({ color: 0xffe9c0, emissive: 0xffb84d, emissiveIntensity: 1.4 })
-    );
-    bulb.position.set(x, 3.55, 4.2);
-    g.add(bulb);
-  }
+  // Bruno Simon platform props: a lantern at each end + a bench.
+  // Each proto is recentered at origin; scale to fit and rest its base on the
+  // platform top (y = 0.9).
+  const placeProp = (proto, { x, z, target, axis = 'y', rotY = 0 }) => {
+    if (!proto) return;
+    const clone = proto.clone();
+    clone.rotation.y = rotY;
+    clone.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const s = target / (axis === 'y' ? size.y : size.x || 1);
+    clone.scale.setScalar(s);
+    clone.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(clone);
+    clone.position.set(x, 0.9 - box2.min.y, z);
+    g.add(clone);
+  };
 
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.7), accent);
-  bench.position.set(5.2, 1.3, 3.2);
-  g.add(bench);
-  for (const x of [4.3, 6.1]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.6), lambert(DARK));
-    leg.position.set(x, 1.05, 3.2);
-    g.add(leg);
+  for (const x of [-6.6, 6.6]) {
+    placeProp(assets?.lanternProto, { x, z: 4.0, target: 3.0, axis: 'y' });
   }
+  placeProp(assets?.benchProto, { x: 3.4, z: 3.2, target: 2.4, axis: 'x', rotY: Math.PI });
 
   g.traverse((o) => {
     if (o.isMesh) {
@@ -149,7 +151,7 @@ function buildStation(name, color) {
 }
 
 // Places a station beside the track plus its big name painted on the ground.
-export function createStations(scene, curve, trackLength, stationDefs) {
+export function createStations(scene, curve, trackLength, stationDefs, assets) {
   const built = [];
   const tmpTan = new THREE.Vector3();
   const tmpNorm = new THREE.Vector3();
@@ -161,7 +163,7 @@ export function createStations(scene, curve, trackLength, stationDefs) {
     tmpNorm.crossVectors(UP, tmpTan).normalize();
     const side = i % 2 === 0 ? 1 : -1;
 
-    const { group, signGroup, beaconMat } = buildStation(def.name, def.color);
+    const { group, signGroup, beaconMat } = buildStation(def.name, def.color, assets);
     group.position.copy(point).addScaledVector(tmpNorm, side * 9.5);
     group.position.y = 0;
     group.lookAt(point.x, 0, point.z);
